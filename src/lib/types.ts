@@ -16,6 +16,9 @@ export interface Word {
   image_url: string | null;
   is_learned: boolean;
   correct_streak: number;
+  /** Cumulative quiz answer counters — drive word "rating" ordering */
+  correct_count: number;
+  wrong_count: number;
   /** Cached wrong options for the quiz (meaning-based) */
   distractors_uk: string[];
   distractors_en: string[];

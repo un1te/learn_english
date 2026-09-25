@@ -9,11 +9,31 @@ export default function AddWordForm() {
   const router = useRouter();
   const [english, setEnglish] = useState("");
   const [translation, setTranslation] = useState("");
-  const [category, setCategory] = useState("");
+  const [translating, setTranslating] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [pendingConfirm, setPendingConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Auto-fill the translation when the English input loses focus,
+  // but only if the user hasn't typed a translation themselves.
+  async function autoTranslate() {
+    const term = english.trim();
+    if (!term || translation.trim()) return;
+    setTranslating(true);
+    try {
+      const res = await fetch(
+        `/api/words/translate?word=${encodeURIComponent(term)}`,
+        { cache: "no-store" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (data.translation) setTranslation(data.translation);
+    } catch {
+      // ignore — user can type the translation manually
+    } finally {
+      setTranslating(false);
+    }
+  }
 
   async function submit(force: boolean) {
     setLoading(true);
@@ -25,7 +45,6 @@ export default function AddWordForm() {
         body: JSON.stringify({
           english,
           translation_uk: translation,
-          category,
           force,
         }),
       });
@@ -47,12 +66,11 @@ export default function AddWordForm() {
       // success — clear the form and refresh the list
       setEnglish("");
       setTranslation("");
-      setCategory("");
       setSuggestions([]);
       setPendingConfirm(false);
       router.refresh();
     } catch {
-      setError("Помилка мережі");
+      setError(t("common.retry"));
     } finally {
       setLoading(false);
     }
@@ -69,7 +87,7 @@ export default function AddWordForm() {
       onSubmit={onSubmit}
       className="space-y-3 rounded-2xl bg-white p-5 shadow ring-1 ring-brand-100"
     >
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <input
           value={english}
           onChange={(e) => {
@@ -77,23 +95,25 @@ export default function AddWordForm() {
             setPendingConfirm(false);
             setSuggestions([]);
           }}
+          onBlur={autoTranslate}
           required
           placeholder={t("words.englishWord")}
           className="rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
         />
-        <input
-          value={translation}
-          onChange={(e) => setTranslation(e.target.value)}
-          required
-          placeholder={t("words.translation")}
-          className="rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
-        />
-        <input
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          placeholder={t("words.category")}
-          className="rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
-        />
+        <div className="relative">
+          <input
+            value={translation}
+            onChange={(e) => setTranslation(e.target.value)}
+            required
+            placeholder={t("words.translation")}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-200"
+          />
+          {translating && (
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">
+              {t("words.translating")}
+            </span>
+          )}
+        </div>
       </div>
 
       {error && (

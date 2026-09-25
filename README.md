@@ -8,15 +8,15 @@ Hosted for free on **Vercel + Supabase Free**.
 
 ## Features
 
-- 🔐 Simple registration/sign-in by **name + password** (no email).
-- 📖 Personal dictionary with spellcheck and suggestions.
-- 🖼️ Automatic association image lookup for a word (Pixabay / Openverse).
-- 🃏 **Learn** mode — flip flashcards with pronunciation (Web Speech API).
-- ✅ **Quiz** mode — two directions (EN→UA and UA→EN) with meaning-based options.
-- 🎯 A word becomes **learned** after 3 correct answers in a row.
-- 🔀 Meaning-based wrong options are generated from the internet and cached per word.
-- 🔁 Manual **"learned" toggle** in the dictionary — flip a word back to review it.
-- 🌐 UI in Ukrainian / English (switcher in the header).
+- Simple registration/sign-in by **name + password** (no email).
+- Personal dictionary with spellcheck and suggestions.
+- Automatic association image lookup for a word (Pixabay / Openverse).
+- **Learn** mode — flip flashcards with pronunciation (Web Speech API).
+- **Quiz** mode — two directions (EN→UA and UA→EN) with meaning-based options.
+- A word becomes **learned** after 3 correct answers in a row.
+- Meaning-based wrong options are generated from the internet and cached per word.
+- Manual **"learned" toggle** in the dictionary — flip a word back to review it.
+- UI in Ukrainian / English (switcher in the header).
 
 ---
 

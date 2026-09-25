@@ -7,9 +7,9 @@ import { useI18n } from "@/lib/i18n/LanguageProvider";
 
 type Status =
   | "choose"
-  | "idle"
   | "loading"
-  | "answered"
+  | "playing"
+  | "finished"
   | "error"
   | "not_enough"
   | "all_learned";
@@ -17,18 +17,27 @@ type Status =
 export default function Quiz() {
   const { t } = useI18n();
   const [mode, setMode] = useState<QuizType | null>(null);
-  const [question, setQuestion] = useState<QuizQuestion | null>(null);
   const [status, setStatus] = useState<Status>("choose");
+
+  // Session state
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [index, setIndex] = useState(0);
+  const [score, setScore] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
-  const [correctCount, setCorrectCount] = useState(0);
-  const [total, setTotal] = useState(0);
+  const [answered, setAnswered] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const loadQuestion = useCallback(async (type: QuizType) => {
+  const loadSession = useCallback(async (type: QuizType) => {
     setStatus("loading");
+    setQuestions([]);
+    setIndex(0);
+    setScore(0);
     setSelected(null);
+    setAnswered(false);
     try {
-      const res = await fetch(`/api/quiz?type=${type}`, { cache: "no-store" });
+      const res = await fetch(`/api/quiz/session?type=${type}`, {
+        cache: "no-store",
+      });
       if (res.status === 422) {
         const data = await res.json().catch(() => ({}));
         setStatus(data.error === "all_learned" ? "all_learned" : "not_enough");
@@ -39,8 +48,8 @@ export default function Quiz() {
         return;
       }
       const data = await res.json();
-      setQuestion(data.question);
-      setStatus("idle");
+      setQuestions(data.questions ?? []);
+      setStatus("playing");
     } catch {
       setStatus("error");
     }
@@ -48,25 +57,25 @@ export default function Quiz() {
 
   function start(type: QuizType) {
     setMode(type);
-    setCorrectCount(0);
-    setTotal(0);
-    loadQuestion(type);
+    loadSession(type);
   }
 
   function backToChoose() {
     setMode(null);
-    setQuestion(null);
+    setQuestions([]);
     setStatus("choose");
   }
 
   async function choose(option: string) {
-    if (status !== "idle" || !question) return;
+    if (answered) return;
+    const question = questions[index];
+    if (!question) return;
+
     setSelected(option);
-    setStatus("answered");
+    setAnswered(true);
 
     const correct = option === question.answer;
-    setTotal((n) => n + 1);
-    if (correct) setCorrectCount((c) => c + 1);
+    if (correct) setScore((s) => s + 1);
 
     try {
       const res = await fetch("/api/quiz/answer", {
@@ -77,11 +86,21 @@ export default function Quiz() {
       const data = await res.json().catch(() => ({}));
       if (data.justLearned) {
         setToast(t("quiz.justLearned"));
-        setTimeout(() => setToast(null), 2000);
+        setTimeout(() => setToast(null), 1800);
       }
     } catch {
       // not critical for UX
     }
+  }
+
+  function next() {
+    if (index + 1 >= questions.length) {
+      setStatus("finished");
+      return;
+    }
+    setIndex((i) => i + 1);
+    setSelected(null);
+    setAnswered(false);
   }
 
   // --- Direction selection screen ---
@@ -149,12 +168,12 @@ export default function Quiz() {
     );
   }
 
-  if (status === "error" || !question) {
+  if (status === "error") {
     return (
       <div className="text-center">
         <p className="text-red-600">⚠️</p>
         <button
-          onClick={() => mode && loadQuestion(mode)}
+          onClick={() => mode && loadSession(mode)}
           className="mt-3 rounded-xl bg-brand-600 px-4 py-2 font-medium text-white"
         >
           {t("common.retry")}
@@ -163,6 +182,49 @@ export default function Quiz() {
     );
   }
 
+  // --- Result screen ---
+  if (status === "finished") {
+    const total = questions.length;
+    const good = score > 7;
+    const bad = score < 4;
+    return (
+      <div className="flex flex-col items-center gap-5">
+        <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-lg ring-1 ring-brand-100">
+          <div className="text-5xl">{good ? "🎉" : bad ? "💪" : "🙂"}</div>
+          <div className="mt-3 text-2xl font-bold text-brand-800">
+            {score} / {total}
+          </div>
+          <p className="mt-2 text-slate-600">
+            {good
+              ? t("quiz.resultGreat")
+              : bad
+                ? t("quiz.resultTryHarder")
+                : t("quiz.resultOk")}
+          </p>
+        </div>
+
+        <p className="text-slate-600">{t("quiz.continueQuestion")}</p>
+        <div className="flex gap-3">
+          <button
+            onClick={() => mode && loadSession(mode)}
+            className="rounded-xl bg-brand-600 px-6 py-2.5 font-semibold text-white shadow hover:bg-brand-700"
+          >
+            {t("quiz.continueYes")}
+          </button>
+          <a
+            href="/dashboard"
+            className="rounded-xl bg-white px-6 py-2.5 font-semibold text-brand-700 shadow ring-1 ring-brand-200 hover:bg-brand-50"
+          >
+            {t("quiz.continueNo")}
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Playing ---
+  const question = questions[index];
+  if (!question) return null;
   const isEnUa = question.type === "en-ua";
 
   return (
@@ -175,7 +237,10 @@ export default function Quiz() {
 
       <div className="flex items-center gap-4 text-sm text-slate-500">
         <span>
-          {t("quiz.correct")}: {correctCount} / {total}
+          {t("quiz.question")} {index + 1} / {questions.length}
+        </span>
+        <span>
+          {t("quiz.correct")}: {score}
         </span>
         <button
           onClick={backToChoose}
@@ -198,7 +263,7 @@ export default function Quiz() {
             <button
               onClick={() => speak(question.prompt)}
               className="rounded-full bg-brand-50 px-3 py-1 text-brand-700 hover:bg-brand-100"
-              aria-label="Озвучити"
+              aria-label="Listen"
             >
               🔊
             </button>
@@ -213,7 +278,7 @@ export default function Quiz() {
           const isSelected = opt === selected;
           let cls =
             "rounded-2xl border px-4 py-4 text-center font-medium transition ";
-          if (status === "answered") {
+          if (answered) {
             if (isAnswer) cls += "border-green-500 bg-green-50 text-green-700";
             else if (isSelected)
               cls += "border-red-400 bg-red-50 text-red-600";
@@ -226,7 +291,7 @@ export default function Quiz() {
             <button
               key={opt}
               onClick={() => choose(opt)}
-              disabled={status === "answered"}
+              disabled={answered}
               className={cls}
             >
               {opt}
@@ -235,12 +300,14 @@ export default function Quiz() {
         })}
       </div>
 
-      {status === "answered" && (
+      {answered && (
         <button
-          onClick={() => mode && loadQuestion(mode)}
+          onClick={next}
           className="rounded-xl bg-brand-600 px-6 py-2.5 font-semibold text-white shadow hover:bg-brand-700"
         >
-          {t("quiz.nextQuestion")}
+          {index + 1 >= questions.length
+            ? t("quiz.finish")
+            : t("quiz.nextQuestion")}
         </button>
       )}
     </div>

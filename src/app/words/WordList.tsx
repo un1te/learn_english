@@ -5,12 +5,13 @@ import { useRouter } from "next/navigation";
 import type { Word } from "@/lib/types";
 import { useI18n } from "@/lib/i18n/LanguageProvider";
 import { speak } from "@/lib/speech";
+import LearnProgress from "./LearnProgress";
 
 export default function WordList({ words }: { words: Word[] }) {
   const { t } = useI18n();
   const router = useRouter();
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [unlearningId, setUnlearningId] = useState<string | null>(null);
 
   async function remove(id: string) {
     setDeletingId(id);
@@ -22,17 +23,19 @@ export default function WordList({ words }: { words: Word[] }) {
     }
   }
 
-  async function toggleLearned(word: Word) {
-    setTogglingId(word.id);
+  // Remove a word from "learned" so it can be practised again.
+  // (Marking as learned manually is not possible — only via the quiz.)
+  async function unlearn(id: string) {
+    setUnlearningId(id);
     try {
-      await fetch(`/api/words/${word.id}`, {
+      await fetch(`/api/words/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_learned: !word.is_learned }),
+        body: JSON.stringify({ is_learned: false }),
       });
       router.refresh();
     } finally {
-      setTogglingId(null);
+      setUnlearningId(null);
     }
   }
 
@@ -69,6 +72,12 @@ export default function WordList({ words }: { words: Word[] }) {
             <div className="text-sm text-slate-500">{w.translation_uk}</div>
           </div>
 
+          {/* Learning progress (battery-style 3 bars) */}
+          <LearnProgress
+            streak={w.is_learned ? 3 : w.correct_streak}
+            title={t("words.progressHint")}
+          />
+
           {/* Pronunciation */}
           <button
             onClick={() => speak(w.english)}
@@ -79,19 +88,26 @@ export default function WordList({ words }: { words: Word[] }) {
             🔊
           </button>
 
-          {/* "Learned" toggle — clickable badge */}
-          <button
-            onClick={() => toggleLearned(w)}
-            disabled={togglingId === w.id}
-            title={t("words.toggleLearned")}
-            className={`rounded-full px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 ${
-              w.is_learned
-                ? "bg-green-100 text-green-700 hover:bg-green-200"
-                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-            }`}
-          >
-            {w.is_learned ? `✓ ${t("words.learnedBadge")}` : t("words.learningBadge")}
-          </button>
+          {/*
+            "Learned" status.
+            - Learned word → clickable badge to REMOVE it from learned.
+            - Not-learned word → static badge (can't mark as learned by hand;
+              that only happens through the quiz).
+          */}
+          {w.is_learned ? (
+            <button
+              onClick={() => unlearn(w.id)}
+              disabled={unlearningId === w.id}
+              title={t("words.unlearnHint")}
+              className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 transition hover:bg-green-200 disabled:opacity-50"
+            >
+              ✓ {t("words.learnedBadge")}
+            </button>
+          ) : (
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500">
+              {t("words.learningBadge")}
+            </span>
+          )}
 
           <button
             onClick={() => remove(w.id)}

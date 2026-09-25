@@ -18,6 +18,10 @@ export default function BackfillButton() {
     try {
       const res = await fetch("/api/words/backfill-distractors", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // "all" — regenerate for every word so low-quality options
+        // created earlier get refreshed, not just empty ones.
+        body: JSON.stringify({ mode: "all" }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {

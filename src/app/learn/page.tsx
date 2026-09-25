@@ -11,12 +11,15 @@ export default async function LearnPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // Only words that are not learned yet.
+  // Only words that are not learned yet, ordered by "rating":
+  // the worst-known first (fewer correct, then more wrong answers).
   const { data } = await supabase
     .from("words")
     .select("*")
     .eq("user_id", user.id)
     .eq("is_learned", false)
+    .order("correct_count", { ascending: true })
+    .order("wrong_count", { ascending: false })
     .order("created_at", { ascending: true });
 
   const words = (data ?? []) as Word[];

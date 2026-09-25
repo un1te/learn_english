@@ -1,4 +1,5 @@
 import { fetchWithTimeout } from "./fetchWithTimeout";
+import { translateToUk } from "./translate";
 
 export interface Distractors {
   /** Meaning-based English words (for UA→EN) */
@@ -40,13 +41,14 @@ export async function buildDistractors(
     const word = candidates[i];
     const tr = translations[i];
     if (!tr) continue;
-    const trNorm = tr.trim().toLowerCase();
+    // Normalize to lowercase for consistent look (avoid "Студент").
+    const clean = tr.trim().toLowerCase();
     // Skip if the translation matches the correct answer
     // or has already been added.
-    if (trNorm === correctUkNorm) continue;
-    if (uk.some((x) => x.toLowerCase() === trNorm)) continue;
-    en.push(word);
-    uk.push(tr);
+    if (clean === correctUkNorm) continue;
+    if (uk.some((x) => x.toLowerCase() === clean)) continue;
+    en.push(word.toLowerCase());
+    uk.push(clean);
     if (en.length >= 6) break;
   }
 
@@ -72,25 +74,4 @@ async function relatedWords(term: string): Promise<string[]> {
   }
 }
 
-/** Translate EN→UK via MyMemory (free, no API key). */
-async function translateToUk(word: string): Promise<string | null> {
-  try {
-    const res = await fetchWithTimeout(
-      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|uk`,
-      { cache: "no-store" },
-      4000
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      responseData?: { translatedText?: string };
-    };
-    const text = data.responseData?.translatedText?.trim();
-    if (!text) return null;
-    // Discard if the translation is suspiciously long (a whole sentence) or Latin.
-    if (text.split(/\s+/).length > 3) return null;
-    if (/^[a-z0-9\s-]+$/i.test(text)) return null; // not translated (still Latin)
-    return text;
-  } catch {
-    return null;
-  }
-}
+

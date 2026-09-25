@@ -57,7 +57,7 @@ export default function DashboardContent({
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <a
           href="/words"
           className="rounded-2xl bg-white p-6 shadow ring-1 ring-brand-100 hover:ring-brand-300"
@@ -89,6 +89,16 @@ export default function DashboardContent({
             {t("dash.quiz")}
           </div>
           <div className="text-sm text-slate-500">{t("dash.quizHint")}</div>
+        </a>
+        <a
+          href="/match"
+          className="rounded-2xl bg-white p-6 shadow ring-1 ring-brand-100 hover:ring-brand-300"
+        >
+          <div className="text-3xl">🧩</div>
+          <div className="mt-2 font-semibold text-slate-800">
+            {t("dash.match")}
+          </div>
+          <div className="text-sm text-slate-500">{t("dash.matchHint")}</div>
         </a>
       </div>
     </main>

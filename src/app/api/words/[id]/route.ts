@@ -3,9 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 
 /**
  * PATCH /api/words/:id — update a word of the current user.
- * Body: { is_learned?: boolean }
- * When the "learned" flag is removed, reset correct_streak so the word
- * goes through the quiz path again.
+ * Body: { is_learned: false }
+ *
+ * Only UN-learning is allowed here (true → false): the user may remove
+ * a word from "learned" to practise it again. Marking a word as learned
+ * manually is NOT permitted — that happens only through the quiz
+ * (3 correct answers in a row). Any request with is_learned = true is rejected.
+ * Removing the flag resets correct_streak so the word restarts its path.
  */
 export async function PATCH(
   request: Request,
@@ -27,19 +31,17 @@ export async function PATCH(
     return NextResponse.json({ error: "bad_request" }, { status: 400 });
   }
 
-  if (typeof body.is_learned !== "boolean") {
-    return NextResponse.json({ error: "bad_request" }, { status: 400 });
+  // Only un-learning is allowed. Reject anything other than false.
+  if (body.is_learned !== false) {
+    return NextResponse.json(
+      { error: "manual_learn_not_allowed" },
+      { status: 400 }
+    );
   }
-
-  const update: { is_learned: boolean; correct_streak?: number } = {
-    is_learned: body.is_learned,
-  };
-  // "Learned" removed → start the counter over.
-  if (body.is_learned === false) update.correct_streak = 0;
 
   const { data, error } = await supabase
     .from("words")
-    .update(update)
+    .update({ is_learned: false, correct_streak: 0 })
     .eq("id", id)
     .eq("user_id", user.id)
     .select("*")

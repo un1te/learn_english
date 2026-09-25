@@ -5,11 +5,16 @@ import { buildDistractors } from "@/lib/external/distractors";
 
 /**
  * POST /api/words/backfill-distractors
- * Backfills distractors for the current user's words whose cache is
- * still empty (added before this feature existed). Processes up to 15
- * words per call to avoid hitting external API rate limits.
+ * (Re)generates meaning-based distractors for the current user's words.
+ *
+ * Body: { mode?: "empty" | "all" }
+ *   - "empty" (default): only words without cached distractors.
+ *   - "all": regenerate for every word (used to refresh low-quality
+ *     options generated earlier).
+ * Processes up to 15 words per call to avoid external API rate limits;
+ * `remaining` tells the client how many are left for the next click.
  */
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -18,19 +23,31 @@ export async function POST() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  let mode: "empty" | "all" = "empty";
+  try {
+    const body = (await request.json()) as { mode?: "empty" | "all" };
+    if (body?.mode === "all") mode = "all";
+  } catch {
+    // no body — keep default "empty"
+  }
+
   const { data } = await supabase
     .from("words")
     .select("*")
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: true });
 
   const words = (data ?? []) as Word[];
-  const needBackfill = words.filter(
-    (w) =>
-      (w.distractors_uk?.length ?? 0) === 0 &&
-      (w.distractors_en?.length ?? 0) === 0
-  );
+  const targets =
+    mode === "all"
+      ? words
+      : words.filter(
+          (w) =>
+            (w.distractors_uk?.length ?? 0) === 0 &&
+            (w.distractors_en?.length ?? 0) === 0
+        );
 
-  const batch = needBackfill.slice(0, 15);
+  const batch = targets.slice(0, 15);
   let updated = 0;
 
   for (const w of batch) {
@@ -46,6 +63,6 @@ export async function POST() {
 
   return NextResponse.json({
     updated,
-    remaining: Math.max(0, needBackfill.length - batch.length),
+    remaining: Math.max(0, targets.length - batch.length),
   });
 }
