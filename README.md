@@ -1,5 +1,7 @@
 # English Words 📚
 
+[Hosted version of app](https://learn-english-alpha-dusky.vercel.app)
+
 A web app that helps a child learn English words: a personal dictionary,
 flip flashcards, a translation quiz, and manual control over what is learned.
 
